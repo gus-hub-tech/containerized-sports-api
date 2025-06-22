@@ -142,4 +142,13 @@ Add DynamoDB to store user-specific queries and preferences
 Secure the API Gateway using an API key or IAM-based authentication
 Implement CI/CD for automating container deployments
 
+## License
+
+This project is for educational and demonstration purposes.  
+See individual files for additional licensing information if present.
+
+---
+
+*Feel free to expand, adapt, or integrate this template to fit your own applications!*
+
 
