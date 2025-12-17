@@ -16,9 +16,76 @@ This project demonstrates building a containerized API management system for que
 ## **Prerequisites**
 - **Sports API Key**: Sign up for a free account and subscription & obtain your API Key at serpapi.com
 - **AWS Account**: Create an AWS Account & have basic understanding of ECS, API Gateway, Docker & Python
-- **AWS CLI Installed and Configured**: Install & configure AWS CLI to programatically interact with AWS
-- **Serpapi Library**: Install Serpapi library in local environment "pip install google-search-results"
-- **Docker CLI and Desktop Installed**: To build & push container images
+
+### **AWS CLI Installation and Configuration**
+Install AWS CLI to programmatically interact with AWS services:
+
+**Installation:**
+```bash
+# Linux/macOS
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Windows (PowerShell)
+msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+
+# Verify installation
+aws --version
+```
+
+**Configuration:**
+```bash
+aws configure
+# Enter your AWS Access Key ID
+# Enter your AWS Secret Access Key
+# Default region: us-east-1
+# Default output format: json
+```
+
+### **Serpapi Library Installation**
+Install the Google Search Results library for accessing SerpAPI:
+
+```bash
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install required dependencies
+pip install Flask==2.2.5 requests==2.31.0
+
+# Verify installation
+python -c "from serpapi import GoogleSearch; print('SerpAPI installed successfully')"
+```
+
+### **Docker Installation**
+Install Docker CLI and Desktop for containerization:
+
+**Docker Desktop:**
+- **Windows/macOS**: Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop)
+- **Linux**: 
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install docker.io docker-compose
+
+# For WSL2 users:
+sudo service docker start
+# Add to ~/.bashrc for auto-start: echo 'sudo service docker start' >> ~/.bashrc
+
+# For native Linux:
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+```
+
+**Verify Installation:**
+```bash
+docker --version
+docker run hello-world
+```
 
 ---
 
@@ -39,11 +106,11 @@ This project demonstrates building a containerized API management system for que
 ## **Project Structure**
 
 ```bash
-sports-api-management/
-├── app.py # Flask application for querying sports data
+containerized-sports-api/
+├── app.py # Flask application for querying NFL schedule via SerpAPI
 ├── Dockerfile # Dockerfile to containerize the Flask app
-├── requirements.txt # Python dependencies
-├── .gitignore
+├── requirements.txt # Python dependencies (Flask, requests)
+├── .gitignore # Git ignore file
 └── README.md # Project documentation
 ```
 
@@ -87,9 +154,9 @@ docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-a
   - Protocol: TCP
   - Port Name: Leave Blank
   - App Protocol: HTTP
-- Define Environment Eariables:
+- Define Environment Variables:
   - Key: SPORTS_API_KEY
-  - Value: <YOUR_SPORTSDATA.IO_API_KEY>
+  - Value: <YOUR_SERPAPI_API_KEY>
   - Create task definition
 3. Run the Service with an ALB
 - Go to Clusters → Select Cluster → Service → Create.
