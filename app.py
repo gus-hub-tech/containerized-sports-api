@@ -8,6 +8,12 @@ app = Flask(__name__)
 SERP_API_URL = "https://serpapi.com/search.json"
 SERP_API_KEY = os.getenv("SPORTS_API_KEY")
 
+# ADD THIS HEALTH CHECK ROUTE:
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
+# NFL Schedule Endpoint 
 @app.route('/sports', methods=['GET'])
 def get_nfl_schedule():
     #Fetches the NFL schedule from SerpAPI and returns it as JSON
