@@ -43,8 +43,8 @@ aws configure
 # Default output format: json
 ```
 
-### **Serpapi Library Installation**
-Install the Google Search Results library for accessing SerpAPI:
+### **Python Dependencies Installation**
+Set up Python environment and install required packages:
 
 ```bash
 # Create virtual environment (recommended)
@@ -55,7 +55,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install Flask==2.2.5 requests==2.31.0
 
 # Verify installation
-python -c "from serpapi import GoogleSearch; print('SerpAPI installed successfully')"
+python -c "import flask, requests; print('Dependencies installed successfully')"
 ```
 
 ### **Docker Installation**
@@ -123,41 +123,62 @@ containerized-sports-api/
 git clone https://github.com/gus-hub-tech/containerized-sports-api.git
 cd containerized-sports-api
 ```
-### **Create ECR Repo**
+### **Get Your AWS Account ID**
+```bash
+# Get your AWS Account ID (save this for later steps)
+aws sts get-caller-identity --query Account --output text
+```
+
+### **Create ECR Repository**
 ```bash
 aws ecr create-repository --repository-name sports-api --region us-east-1
 ```
 
-### **Authenticate Build and Push the Docker Image**
+### **Build and Push Docker Image**
 ```bash
+Get your AWS Account ID
+aws sts get-caller-identity --query Account --output text
+
+Create ECR Repository:
+aws ecr create-repository --repository-name sports-api --region us-east-1
+
+
+# Replace <AWS_ACCOUNT_ID> with your actual AWS Account ID from previous step
+# Authenticate to ECR (expires after 12 hours)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
+# Build Docker image
 docker build --platform linux/amd64 -t sports-api .
+
+# Tag image for ECR
 docker tag sports-api:latest <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-api-latest
+
+# Push to ECR
 docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-api-latest
 ```
 
 ### **Set Up ECS Cluster with Fargate**
-1. Create an ECS Cluster:
-- Go to the ECS Console → Clusters → Create Cluster
-- Name your Cluster (sports-api-cluster)
-- For Infrastructure, select Fargate, then create Cluster
+1. **Create an ECS Cluster:**
+- Navigate to [AWS ECS Console](https://console.aws.amazon.com/ecs/)
+- Click **Clusters** in left sidebar → **Create Cluster**
+- Cluster name: `sports-api-cluster`
+- Infrastructure: Select **AWS Fargate (serverless)**
+- Click **Create**
 
-2. Create a Task Definition:
-- Go to Task Definitions → Create New Task Definition
-- Name your task definition (sports-api-task)
-- For Infrastructure, select Fargate
-- Add the container:
-  - Name your container (sports-api-container)
-  - Image URI: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-api-latest
-  - Container Port: 8080
-  - Protocol: TCP
-  - Port Name: Leave Blank
-  - App Protocol: HTTP
-- Define Environment Variables:
-  - Key: SPORTS_API_KEY
-  - Value: <YOUR_SERPAPI_API_KEY>
-  - Create task definition
+2. **Create a Task Definition:**
+- Click **Task Definitions** → **Create new task definition**
+- Task definition family: `sports-api-task`
+- Launch type: **AWS Fargate**
+- Operating system: **Linux/X86_64**
+- CPU: **0.25 vCPU**, Memory: **0.5 GB**
+- **Add Container:**
+  - Container name: `sports-api-container`
+  - Image URI: `<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-api-latest`
+  - Port mappings: Container port `8080`, Protocol `TCP`
+- **Environment Variables:**
+  - Key: `SPORTS_API_KEY`
+  - Value: `<YOUR_SERPAPI_API_KEY>` (get from [serpapi.com](https://serpapi.com))
+- Click **Create**
 3. Run the Service with an ALB
 - Go to Clusters → Select Cluster → Service → Create.
 - Capacity provider: Fargate
