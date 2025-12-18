@@ -14,8 +14,10 @@ This project demonstrates building a containerized API management system for que
 ---
 
 ## **Prerequisites**
-- **Sports API Key**: Sign up for a free account and subscription & obtain your API Key at serpapi.com
-- **AWS Account**: Create an AWS Account & have basic understanding of ECS, API Gateway, Docker & Python
+- **Sports API Key**: Sign up for a free account at [serpapi.com](https://serpapi.com) and obtain your API key
+- **AWS Account**: Create an AWS account with basic understanding of ECS, API Gateway, Docker & Python
+- **AWS CLI**: Configured with appropriate permissions for ECS, ECR, and API Gateway
+- **Docker**: Installed and running on your local machine
 
 ### **AWS CLI Installation and Configuration**
 Install AWS CLI to programmatically interact with AWS services:
@@ -69,16 +71,22 @@ Install Docker CLI and Desktop for containerization:
 sudo apt update
 sudo apt install docker.io docker-compose
 
-# For WSL2 users:
-sudo service docker start
-# Add to ~/.bashrc for auto-start: echo 'sudo service docker start' >> ~/.bashrc
+# Add user to docker group
+sudo usermod -aG docker $USER
+```
 
+**Start Docker Daemon:**
+```bash
 # For native Linux:
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# Add user to docker group
-sudo usermod -aG docker $USER
+# For WSL2:
+sudo service docker start
+
+# Alternative methods if above don't work:
+sudo dockerd &  # Run in background
+# Or install Docker Desktop and start it manually
 ```
 
 **Verify Installation:**
@@ -123,30 +131,34 @@ containerized-sports-api/
 git clone https://github.com/gus-hub-tech/containerized-sports-api.git
 cd containerized-sports-api
 ```
-### **Get Your AWS Account ID**
-```bash
-# Get your AWS Account ID (save this for later steps)
-aws sts get-caller-identity --query Account --output text
-```
-
-### **Create ECR Repository**
-```bash
-aws ecr create-repository --repository-name sports-api --region us-east-1
-```
-
 ### **Build and Push Docker Image**
+
+**Step 1: Get AWS Account ID**
 ```bash
-Get your AWS Account ID
 aws sts get-caller-identity --query Account --output text
+```
 
-Create ECR Repository:
+**Step 2: Create ECR Repository**
+```bash
 aws ecr create-repository --repository-name sports-api --region us-east-1
+```
 
-
-# Replace <AWS_ACCOUNT_ID> with your actual AWS Account ID from previous step
-# Authenticate to ECR (expires after 12 hours)
+**Step 3: Authenticate with ECR**
+```bash
+# Replace <AWS_ACCOUNT_ID> with your actual AWS Account ID from step 1
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+```
 
+**Troubleshooting Authentication:**
+- If you get "no basic auth credential" error, run the ECR login command above
+- If you get "permission denied" error, ensure Docker daemon is running:
+  ```bash
+  sudo systemctl start docker  # or sudo service docker start
+  ```
+- ECR authentication expires after 12 hours, re-run the login command if needed
+
+**Step 4: Build and Push**
+```bash
 # Build Docker image
 docker build --platform linux/amd64 -t sports-api .
 
@@ -179,64 +191,141 @@ docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sports-api:sports-a
   - Key: `SPORTS_API_KEY`
   - Value: `<YOUR_SERPAPI_API_KEY>` (get from [serpapi.com](https://serpapi.com))
 - Click **Create**
-3. Run the Service with an ALB
-- Go to Clusters → Select Cluster → Service → Create.
-- Capacity provider: Fargate
-- Select Deployment configuration family (sports-api-task)
-- Name your service (sports-api-service)
-- Desired tasks: 2
-- Networking: Create new security group
-- Networking Configuration:
-  - Type: All TCP
-  - Source: Anywhere
-- Load Balancing: Select Application Load Balancer (ALB).
-- ALB Configuration:
- - Create a new ALB:
- - Name: sports-api-alb
- - Target Group health check path: "/sports"
- - Create service
-4. Test the ALB:
-- After deploying the ECS service, note the DNS name of the ALB (e.g., sports-api-alb-<AWS_ACCOUNT_ID>.us-east-1.elb.amazonaws.com)
-- Confirm the API is accessible by visiting the ALB DNS name in your browser and adding /sports at end (e.g, http://sports-api-alb-<AWS_ACCOUNT_ID>.us-east-1.elb.amazonaws.com/sports)
+3. **Create and Run ECS Service with ALB:**
+- Go to **Clusters** → Select your cluster → **Services** → **Create**
+- **Service Configuration:**
+  - Capacity provider: **Fargate**
+  - Task definition family: **sports-api-task**
+  - Service name: **sports-api-service**
+  - Desired tasks: **2**
+- **Networking:**
+  - Create new security group
+  - Type: **All TCP**
+  - Source: **Anywhere (0.0.0.0/0)**
+- **Load Balancing:**
+  - Select **Application Load Balancer (ALB)**
+  - Create new ALB: **sports-api-alb**
+  - Target group health check path: **"/"**
+- Click **Create Service**
+
+4. **Test the ALB:**
+- Note the ALB DNS name (e.g., `sports-api-alb-<random>.us-east-1.elb.amazonaws.com`)
+- Test endpoints:
+  ```bash
+  # Health check
+  curl http://sports-api-alb-<random>.us-east-1.elb.amazonaws.com/
+  
+  # Sports API
+  curl http://sports-api-alb-<random>.us-east-1.elb.amazonaws.com/sports
+  ```
 
 ### **Configure API Gateway**
-1. Create a New REST API:
-- Go to API Gateway Console → Create API → REST API
-- Name the API (e.g., Sports API Gateway)
 
-2. Set Up Integration:
-- Create a resource /sports
-- Create a GET method
-- Choose HTTP Proxy as the integration type
-- Enter the DNS name of the ALB that includes "/sports" (e.g. http://sports-api-alb-<AWS_ACCOUNT_ID>.us-east-1.elb.amazonaws.com/sports
+1. **Create REST API:**
+- Go to [API Gateway Console](https://console.aws.amazon.com/apigateway/)
+- Click **Create API** → **REST API** → **Build**
+- API name: **Sports API Gateway**
+- Click **Create API**
 
-3. Deploy the API:
-- Deploy the API to a stage (e.g., prod)
-- Note the endpoint URL
+2. **Set Up Integration:**
+- Create resource: **Actions** → **Create Resource**
+  - Resource name: **sports**
+  - Resource path: **/sports**
+- Create method: Select **/sports** → **Actions** → **Create Method** → **GET**
+- **Integration Setup:**
+  - Integration type: **HTTP Proxy**
+  - HTTP method: **GET**
+  - Endpoint URL: `http://sports-api-alb-<random>.us-east-1.elb.amazonaws.com/sports`
+- Click **Save**
 
-### **Test the System**
-- Use curl or a browser to test:
+3. **Deploy API:**
+- **Actions** → **Deploy API**
+- Deployment stage: **New Stage**
+- Stage name: **prod**
+- Click **Deploy**
+- Note the **Invoke URL**
+
+### **Test the Complete System**
+
+**Test API Gateway Endpoint:**
 ```bash
+# Replace with your actual API Gateway URL
 curl https://<api-gateway-id>.execute-api.us-east-1.amazonaws.com/prod/sports
 ```
 
-### **What We Learned**
-Setting up a scalable, containerized application with ECS
-Creating public APIs using API Gateway.
+**Expected Response:**
+```json
+{
+  "message": "NFL schedule fetched successfully.",
+  "games": [
+    {
+      "away_team": "Team A",
+      "home_team": "Team B",
+      "venue": "Stadium Name",
+      "date": "Date",
+      "time": "Time ET"
+    }
+  ]
+}
+```
 
-### **Future Enhancements**
-Add caching for frequent API requests using Amazon ElastiCache
-Add DynamoDB to store user-specific queries and preferences
-Secure the API Gateway using an API key or IAM-based authentication
-Implement CI/CD for automating container deployments
+## **Key Learnings**
+- Containerizing applications with Docker and deploying to AWS ECS Fargate
+- Setting up Application Load Balancers for container orchestration
+- Creating and managing REST APIs with Amazon API Gateway
+- Integrating external APIs (SerpAPI) in cloud applications
+- Implementing health checks and monitoring for containerized services
 
-## License
+## **Architecture Benefits**
+- **Scalability**: ECS Fargate automatically scales based on demand
+- **Serverless**: No server management required
+- **High Availability**: Multi-AZ deployment with ALB
+- **Cost Effective**: Pay only for resources used
+- **Security**: VPC isolation and IAM role-based access
 
-This project is for educational and demonstration purposes.  
-See individual files for additional licensing information if present.
+## **Future Enhancements**
+- **Caching**: Add Amazon ElastiCache for frequent API requests
+- **Database**: Implement DynamoDB for user preferences and query history
+- **Security**: Add API Gateway authentication (API keys, Cognito, or IAM)
+- **Monitoring**: Integrate CloudWatch dashboards and alarms
+- **CI/CD**: Implement automated deployments with CodePipeline
+- **Multi-Region**: Deploy across multiple AWS regions for global availability
+
+## **Troubleshooting**
+
+**Common Issues:**
+- **Docker daemon not running**: Run `sudo systemctl start docker`
+- **ECR authentication failed**: Re-run the ECR login command
+- **ECS task failing**: Check CloudWatch logs for container errors
+- **API Gateway 502 errors**: Verify ALB health checks are passing
+- **No sports data returned**: Verify SPORTS_API_KEY environment variable is set
+
+**Useful Commands:**
+```bash
+# Check ECS service status
+aws ecs describe-services --cluster sports-api-cluster --services sports-api-service
+
+# View container logs
+aws logs describe-log-groups --log-group-name-prefix "/ecs/sports-api"
+
+# Test ALB directly
+curl -v http://your-alb-dns-name.elb.amazonaws.com/sports
+```
+
+## **Cost Estimation**
+- **ECS Fargate**: ~$0.04/hour per task (0.25 vCPU, 0.5 GB RAM)
+- **Application Load Balancer**: ~$0.0225/hour + $0.008/LCU-hour
+- **API Gateway**: $3.50 per million API calls
+- **ECR**: $0.10/GB-month for storage
+
+**Estimated monthly cost for low traffic**: $15-25/month
+
+## **License**
+
+This project is for educational and demonstration purposes.
 
 ---
 
-*Feel free to expand, adapt, or integrate this template to fit your own applications!*
+**Ready to deploy your own containerized API? Fork this repository and customize it for your use case!**
 
 
